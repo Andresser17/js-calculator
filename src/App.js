@@ -1,5 +1,6 @@
 import "./App.css";
 import { Component } from "react";
+import { Parser } from "expr-eval";
 
 const NUMBERS = [
   {
@@ -46,6 +47,8 @@ const NUMBERS = [
     id: "decimal",
     symbol: ".",
   },
+];
+const OPERATORS = [
   {
     id: "add",
     symbol: "+",
@@ -55,16 +58,16 @@ const NUMBERS = [
     symbol: "-",
   },
   {
-    id: "divide",
-    symbol: "/",
-  },
-  {
     id: "multiply",
     symbol: "x",
   },
+  {
+    id: "divide",
+    symbol: "/",
+  },
 ];
 
-const OPERATORS = [
+const OPTIONS = [
   {
     id: "clear",
     symbol: "C",
@@ -108,96 +111,123 @@ class App extends Component {
     this.state = {
       numbers: NUMBERS,
       operators: OPERATORS,
+      options: OPTIONS,
+      delete: [{ id: "delete", symbol: "<" }],
       total: 0,
-      actualOp: "0",
+      actualCalc: "0",
       historial: [],
       clearAll: false,
-      completedOp: false,
+      completedCalc: false,
+      decimal: false,
     };
-    this.showOp = this.showOp.bind(this);
+    this.showCalc = this.showCalc.bind(this);
     this.calc = this.calc.bind(this);
+    this.delete = this.delete.bind(this);
   }
 
-  showOp(symbol) {
-    const actualOp = this.state.actualOp;
-    const completedOp = this.state.completedOp;
+  showCalc(symbol) {
+    const actualCalc = this.state.actualCalc;
+    const completedCalc = this.state.completedCalc;
 
-    if (actualOp === "0") {
+    if (actualCalc === "0") {
       this.setState({
-        actualOp: symbol,
+        actualCalc: symbol,
       });
     } else if (
-      symbol === "+" && completedOp ||
+      (symbol === "+" && completedCalc) ||
       symbol === "-" ||
       symbol === "/" ||
       symbol === "x"
     ) {
       this.setState((state) => ({
-        actualOp: String(state.actualOp + String(symbol)),
-        completedOp: false
+        actualCalc: String(state.actualCalc + String(symbol)),
+        completedCalc: false,
       }));
-
-    } else if (completedOp) {
+    } else if (completedCalc) {
       this.setState({
-        actualOp: symbol,
-        completedOp: false,
+        actualCalc: symbol,
+        completedCalc: false,
       });
+    } else if (symbol === ".") {
+      if (this.state.decimal) {
+        return;
+      }
+      this.setState((state) => ({
+        actualCalc: String(state.actualCalc + String(symbol)),
+        decimal: true,
+      }));
     } else {
       this.setState((state) => ({
-        actualOp: String(state.actualOp + String(symbol)),
+        actualCalc: String(state.actualCalc + String(symbol)),
       }));
     }
   }
 
-  calc(symbol) {
-    const actualOp = this.state.actualOp.slice();
-    const calc = eval(actualOp.replace("x", "*"));
-    const completedOp = this.state.completedOp;
+  calcHelper(op) {
+    const calc = op.replace("x", "*");
 
-    if (symbol === "=" && !completedOp) {
+    let parser = new Parser();
+    let expr = parser.parse(calc);
+
+    return expr.evaluate();
+  }
+
+  calc(symbol) {
+    const actualCalc = this.state.actualCalc.slice();
+    const calc = this.calcHelper(actualCalc);
+    const completedCalc = this.state.completedCalc;
+
+    if (symbol === "=" && !completedCalc) {
       this.setState((state) => ({
-        historial: [...state.historial, actualOp],
-        actualOp: String(calc),
+        historial: [...state.historial, actualCalc],
+        actualCalc: String(calc),
         clearAll: false,
-        completedOp: true,
+        completedCalc: true,
       }));
-    } else if (symbol === "=" && completedOp) {
+    } else if (symbol === "=" && completedCalc) {
       this.setState((state) => ({
         clearAll: false,
       }));
     } else if (!this.state.clearAll) {
       this.setState((state) => ({
-        actualOp: "0",
+        actualCalc: "0",
         clearAll: true,
-        completedOp: false,
+        completedCalc: false,
       }));
     } else {
       this.setState((state) => ({
         historial: [],
-        actualOp: "0",
+        actualCalc: "0",
         clearAll: false,
-        completedOp: false,
+        completedCalc: false,
       }));
     }
   }
 
-  clear(symbol) {}
+  delete() {
+
+    this.setState(state => ({
+      actualCalc: state.actualCalc.slice(0, -1)
+    }))
+  }
 
   render() {
     const historial = this.state.historial.map((item, index) => {
       return <li key={index}>{item}</li>;
     });
-    const actualOp = this.state.actualOp;
+    const actualCalc = this.state.actualCalc;
 
     return (
       <div className="App">
         <div id="display">
           <ul id="historial">{historial}</ul>
-          <span id="actual-op">{actualOp}</span>
+          <span id="actual-calc">{actualCalc}</span>
         </div>
         <div id="calc">
-          <CalcButton funct={this.showOp} buttons={this.state.numbers} />
-          <CalcButton funct={this.calc} buttons={this.state.operators} />
+          <CalcButton funct={this.showCalc} buttons={this.state.numbers} />
+          <CalcButton funct={this.showCalc} buttons={this.state.operators} />
+          <CalcButton funct={this.calc} buttons={this.state.options} />
+          <CalcButton funct={this.delete} buttons={this.state.delete} />
         </div>
       </div>
     );
