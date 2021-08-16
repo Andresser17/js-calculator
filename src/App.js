@@ -116,7 +116,6 @@ class App extends Component {
       total: 0,
       actualCalc: "0",
       historial: [],
-      clearAll: false,
       completedCalc: false,
       decimal: false,
     };
@@ -130,18 +129,29 @@ class App extends Component {
     const completedCalc = this.state.completedCalc;
 
     if (actualCalc === "0") {
+      if (
+        symbol === "." ||
+        symbol === "+" ||
+        symbol === "-" ||
+        symbol === "x" ||
+        symbol === "/"
+      ) {
+        return;
+      }
+
       this.setState({
         actualCalc: symbol,
       });
     } else if (
       (symbol === "+" && completedCalc) ||
-      symbol === "-" ||
-      symbol === "/" ||
-      symbol === "x"
+      (symbol === "-" && completedCalc) ||
+      (symbol === "x" && completedCalc) ||
+      (symbol === "/" && completedCalc)
     ) {
       this.setState((state) => ({
         actualCalc: String(state.actualCalc + String(symbol)),
         completedCalc: false,
+        decimal: false,
       }));
     } else if (completedCalc) {
       this.setState({
@@ -152,11 +162,57 @@ class App extends Component {
       if (this.state.decimal) {
         return;
       }
+
       this.setState((state) => ({
         actualCalc: String(state.actualCalc + String(symbol)),
         decimal: true,
       }));
     } else {
+      if (
+        symbol === "+" ||
+        symbol === "-" ||
+        symbol === "x" ||
+        symbol === "/"
+      ) {
+        this.setState((state) => ({
+          decimal: false,
+        }));
+      }
+
+      const lastChar = actualCalc[actualCalc.length - 1];
+      const lastCharEval =
+        (lastChar === "+" || lastChar === "x" || lastChar === "/") &&
+        (symbol === "+" || symbol === "x" || symbol === "/");
+
+      if (lastCharEval) {
+        this.setState((state) => ({
+          actualCalc: String(state.actualCalc.slice(0, -1) + String(symbol)),
+        }));
+        return;
+      }
+
+      const penChar = actualCalc[actualCalc.length - 2];
+      if (lastChar === "-" && symbol === "-") {
+        return;
+      } else if (
+        lastChar === "-" &&
+        (penChar === "+" || penChar === "x" || penChar === "/") &&
+        (symbol === "+" || symbol === "x" || symbol === "/")
+      ) {
+        this.setState((state) => ({
+          actualCalc: String(state.actualCalc.slice(0, -2) + String(symbol)),
+        }));
+        return;
+      } else if (
+        lastChar === "-" &&
+        (symbol === "+" || symbol === "x" || symbol === "/")
+      ) {
+        this.setState((state) => ({
+          actualCalc: String(state.actualCalc.slice(0, -1) + String(symbol)),
+        }));
+        return;
+      }
+
       this.setState((state) => ({
         actualCalc: String(state.actualCalc + String(symbol)),
       }));
@@ -165,50 +221,38 @@ class App extends Component {
 
   calcHelper(op) {
     const calc = op.replace("x", "*");
-
     let parser = new Parser();
     let expr = parser.parse(calc);
-
     return expr.evaluate();
   }
 
   calc(symbol) {
     const actualCalc = this.state.actualCalc.slice();
-    const calc = this.calcHelper(actualCalc);
-    const completedCalc = this.state.completedCalc;
 
-    if (symbol === "=" && !completedCalc) {
+    if (symbol === "=") {
+      const calc = this.calcHelper(actualCalc);
+
       this.setState((state) => ({
         historial: [...state.historial, actualCalc],
         actualCalc: String(calc),
-        clearAll: false,
         completedCalc: true,
-      }));
-    } else if (symbol === "=" && completedCalc) {
-      this.setState((state) => ({
-        clearAll: false,
-      }));
-    } else if (!this.state.clearAll) {
-      this.setState((state) => ({
-        actualCalc: "0",
-        clearAll: true,
-        completedCalc: false,
+        decimal: false,
       }));
     } else {
       this.setState((state) => ({
         historial: [],
         actualCalc: "0",
-        clearAll: false,
         completedCalc: false,
+        decimal: false,
+        lastInputCharacter: "",
       }));
     }
   }
 
   delete() {
-
-    this.setState(state => ({
-      actualCalc: state.actualCalc.slice(0, -1)
-    }))
+    this.setState((state) => ({
+      actualCalc: state.actualCalc.slice(0, -1),
+    }));
   }
 
   render() {
@@ -219,9 +263,9 @@ class App extends Component {
 
     return (
       <div className="App">
-        <div id="display">
+        <div id="calc-container">
           <ul id="historial">{historial}</ul>
-          <span id="actual-calc">{actualCalc}</span>
+          <span id="display">{actualCalc}</span>
         </div>
         <div id="calc">
           <CalcButton funct={this.showCalc} buttons={this.state.numbers} />
